@@ -1,0 +1,5 @@
+백업/
+실행하기.bat
+__pycache__/
+*.pyc
+.env
