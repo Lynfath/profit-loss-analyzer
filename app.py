@@ -10,45 +10,12 @@ st.title("📊 [통합] 거래처별 손익분석 시스템")
 # 기본 거래처 목록 (배부 대상)
 DEFAULT_CUSTOMERS = ["중국법인", "롯데케미칼", "지에스큐", "린코스", "케이스티파이", "마곡상인"]
 
-# 표준 대분류 및 세부 항목 옵션
-STD_MAJORS = [
-    "항공 운임", "도급사", "밀크런", "기타", "카드 수수료", "센터 비용",
+# 기본 대분류 옵션 목록
+DEFAULT_MAJORS = [
+    "항공 운임", "도급사", "밀크런", "사내매출 조정", "기타", "카드 수수료", "센터 비용",
     "건물 감가상각비", "지게차 리스", "출입/보안 (에스원/캡스)", "파렛트 렌탈",
-    "부서운영비/야특근식비", "수선비", "토지임차료", "전산 (EDI)", "소모품비 外"
-]
-
-STD_SUBS = [
-    "UPS", "EMS", "ICS", "RINCOS", "마곡상인", "FEDEX",
-    "(주)엠제이플렉스", "(주)인터비즈시스템", "(주)교원스타트원",
-    "밀크런", "기타(항공/기타)", "카드 수수료", "센터 비용",
-    "건물 감가상각비", "지게차 리스", "보안", "파렛트 렌탈",
-    "부서운영비", "수선비", "토지임차료", "전산 (EDI)", "소모품비 外",
-    "감가상각비", "센터운영비용", "DHL", "밀크런 픽업", "케미칼(운송)", "통관수수료", "전기료", "통신비"
-]
-
-MAPPING_RULES = [
-    {"category": "매출원가", "sub_cat": "항공 운임", "item": "UPS", "condition": lambda r: "UPS" in str(r["상세"]) or "유나이티드파슬" in str(r["거래처명"])},
-    {"category": "매출원가", "sub_cat": "항공 운임", "item": "EMS", "condition": lambda r: "EMS" in str(r["상세"]) and "마곡상인" in str(r["거래처명"]) and "K-packet" not in str(r["적요"])},
-    {"category": "매출원가", "sub_cat": "항공 운임", "item": "ICS", "condition": lambda r: "아이씨에스" in str(r["거래처명"]) and "미국" in str(r["상세"])},
-    {"category": "매출원가", "sub_cat": "항공 운임", "item": "RINCOS", "condition": lambda r: "린코스" in str(r["거래처명"])},
-    {"category": "매출원가", "sub_cat": "항공 운임", "item": "마곡상인", "condition": lambda r: "K-packet" in str(r["적요"]) or "K-PACKET" in str(r["상세"])},
-    {"category": "매출원가", "sub_cat": "항공 운임", "item": "FEDEX", "condition": lambda r: "FEDEX" in str(r["적요"]).upper()},
-    {"category": "매출원가", "sub_cat": "도급사", "item": "(주)엠제이플렉스", "condition": lambda r: "엠제이플렉스" in str(r["거래처명"])},
-    {"category": "매출원가", "sub_cat": "도급사", "item": "(주)인터비즈시스템", "condition": lambda r: "인터비즈" in str(r["거래처명"])},
-    {"category": "매출원가", "sub_cat": "도급사", "item": "(주)교원스타트원", "condition": lambda r: "교원" in str(r["거래처명"])},
-    {"category": "매출원가", "sub_cat": "밀크런", "item": "밀크런", "condition": lambda r: "사내매출 조정" in str(r["계정"]) or "롯데택배" in str(r["상세"])},
-    {"category": "매출원가", "sub_cat": "기타", "item": "기타(항공/기타)", "condition": lambda r: "DHL" in str(r["거래처명"]) or "SF" in str(r["상세"])},
-    {"category": "판관비", "sub_cat": "토지임차료", "item": "토지임차료", "condition": lambda r: "토지사용료" in str(r["상세"]) or "토지임차료" in str(r["적요"])},
-    {"category": "판관비", "sub_cat": "전산 (EDI)", "item": "전산 (EDI)", "condition": lambda r: "EDI" in str(r["상세"]) or "케이씨넷" in str(r["거래처명"])},
-    {"category": "판관비", "sub_cat": "지게차 리스", "item": "지게차 리스", "condition": lambda r: "지게차" in str(r["적요"])},
-    {"category": "판관비", "sub_cat": "출입/보안 (에스원/캡스)", "item": "보안", "condition": lambda r: "에스원" in str(r["거래처명"])},
-    {"category": "판관비", "sub_cat": "파렛트 렌탈", "item": "파렛트 렌탈", "condition": lambda r: "한국파렛트풀" in str(r["거래처명"])},
-    {"category": "판관비", "sub_cat": "수선비", "item": "수선비", "condition": lambda r: "수선" in str(r["계정"]) or "블루원" in str(r["거래처명"])},
-    {"category": "판관비", "sub_cat": "부서운영비/야특근식비", "item": "부서운영비", "condition": lambda r: "부서운영비" in str(r["계정"]) or "야특근식대" in str(r["계정"])},
-    {"category": "판관비", "sub_cat": "센터 비용", "item": "센터 비용", "condition": lambda r: "맥서브" in str(r["거래처명"]) or "효성전기" in str(r["거래처명"])},
-    {"category": "판관비", "sub_cat": "기타", "item": "소모품비 外", "condition": lambda r: "소모품비" in str(r["계정"]) or "보험료" in str(r["상세"]) or "재산세" in str(r["상세"])},
-    {"category": "판관비", "sub_cat": "카드 수수료", "item": "카드 수수료", "condition": lambda r: "카드수수료" in str(r["적요"])},
-    {"category": "판관비", "sub_cat": "건물 감가상각비", "item": "건물 감가상각비", "condition": lambda r: "리스자산 상각" in str(r["적요"])},
+    "부서운영비/야특근식비", "수선비", "토지임차료", "전산 (EDI)", "소모품비 外",
+    "통관수수료", "직접비", "공통비", "일반관리비"
 ]
 
 # ----------------------------------------------------
@@ -64,7 +31,6 @@ def auto_col_width(header_text, sample_values=None):
         for val in sample_values:
             max_len = max(max_len, get_len(val))
 
-    # 데이터 규격에 맞추되 보기 편하게 약간의 여유를 둔 규격 판별
     if max_len <= 10:
         return "small"      # 약 80~100px (코드, 상태, 짧은 수치)
     elif max_len <= 22:
@@ -72,9 +38,22 @@ def auto_col_width(header_text, sample_values=None):
     else:
         return "large"      # 약 280~320px (긴 계정명, 상세 적요)
 
+def find_col(df, candidates):
+    for c in candidates:
+        if c in df.columns:
+            return c
+    for c in df.columns:
+        for cand in candidates:
+            if cand in str(c):
+                return c
+    return None
+
 # Session State 초기화
 if "customers" not in st.session_state:
     st.session_state.customers = list(DEFAULT_CUSTOMERS)
+
+if "major_categories" not in st.session_state:
+    st.session_state.major_categories = list(DEFAULT_MAJORS)
 
 if "editor_version" not in st.session_state:
     st.session_state.editor_version = 0
@@ -155,7 +134,7 @@ with st.expander("ℹ️ **업로드 엑셀 파일 표준 양식 안내 및 샘�
 
 uploaded_file = st.file_uploader("📂 엑셀 파일 업로드 (.xlsx, .csv)", type=["xlsx", "csv"])
 
-# 공통 거래처 컬럼 관리 함수 (탭 1, 탭 2 공유)
+# 공통 거래처 컬럼 관리 함수
 def render_customer_manager(key_suffix):
     with st.expander("🏢 **거래처 컬럼 관리 (추가 / 삭제)**", expanded=False):
         c_add, c_del = st.columns(2)
@@ -195,6 +174,48 @@ def render_customer_manager(key_suffix):
             else:
                 st.info("등록된 거래처가 없습니다.")
 
+# 대분류 항목 관리 함수 (추가 / 삭제)
+def render_major_category_manager(key_suffix):
+    with st.expander("📂 **대분류 항목 관리 (추가 / 삭제)**", expanded=False):
+        m_add, m_del = st.columns(2)
+        with m_add:
+            st.markdown("##### ➕ 새 대분류 추가")
+            new_major_name = st.text_input("새 대분류명 입력", placeholder="예: 포장재비, 차량유지비 등", key=f"input_new_major_{key_suffix}")
+            if st.button("대분류 추가", type="primary", key=f"btn_add_major_{key_suffix}"):
+                clean_major = new_major_name.strip()
+                if not clean_major:
+                    st.warning("대분류명을 입력해주세요.")
+                elif clean_major in st.session_state.major_categories:
+                    st.warning("이미 존재하는 대분류입니다.")
+                else:
+                    st.session_state.major_categories.append(clean_major)
+                    st.session_state.editor_version += 1
+                    st.success(f"'{clean_major}' 대분류가 추가되었습니다. (드롭다운 목록에 즉시 반영)")
+                    st.rerun()
+
+        with m_del:
+            st.markdown("##### 🗑️ 기존 대분류 삭제")
+            if len(st.session_state.major_categories) > 0:
+                del_major_target = st.selectbox(
+                    "삭제할 대분류 선택", 
+                    options=["(선택안함)"] + st.session_state.major_categories, 
+                    key=f"select_del_major_{key_suffix}"
+                )
+                if st.button("선택한 대분류 삭제", type="secondary", key=f"btn_del_major_{key_suffix}"):
+                    if del_major_target == "(선택안함)":
+                        st.warning("삭제할 대분류를 선택해주세요.")
+                    else:
+                        st.session_state.major_categories.remove(del_major_target)
+                        if "dash_df" in st.session_state and "대분류" in st.session_state.dash_df.columns:
+                            mask = st.session_state.dash_df["대분류"] == del_major_target
+                            if mask.any():
+                                st.session_state.dash_df.loc[mask, "대분류"] = "기타"
+                        st.session_state.editor_version += 1
+                        st.success(f"'{del_major_target}' 대분류가 삭제되었습니다. (기존 지정 행은 '기타'로 변경)")
+                        st.rerun()
+            else:
+                st.info("등록된 대분류 항목이 없습니다.")
+
 @st.cache_data
 def build_initial_dashboard(file, customers):
     if file.name.endswith(".csv"):
@@ -202,66 +223,96 @@ def build_initial_dashboard(file, customers):
     else:
         df = pd.read_excel(file)
     
-    df["금액(현지 통화)"] = pd.to_numeric(df["금액(현지 통화)"], errors="coerce").fillna(0)
-    df["계정"] = df["계정"].fillna("미분류")
-    df["거래처명"] = df["거래처명"].fillna("-").astype(str).str.strip()
-    df["적요"] = df["적요"].fillna("-")
-    df["상세"] = df["상세"].fillna("-")
+    # 1. 컬럼 매핑 유연화 (원장의 실제 컬럼명 탐색)
+    col_acct = find_col(df, ["계정과목", "계정", "원장 계정", "원장계정", "계정명"])
+    col_desc = find_col(df, ["적요", "원장 적요", "원장적요", "적요 (내용)", "내용"])
+    col_amt = find_col(df, ["금액(현지 통화)", "금액", "원장 금액", "원장금액", "발생금액"])
+    col_vendor = find_col(df, ["거래처명", "매입 거래처명", "매입거래처명", "거래처"])
+    col_detail = find_col(df, ["상세", "원장 상세", "원장상세", "구분", "비고"])
 
-    categories, sub_cats, items, vendors = [], [], [], []
-    for _, row in df.iterrows():
-        matched = False
-        if "브이투브이" in str(row["거래처명"]) or "한국통상" in str(row["거래처명"]) or "AFB/" in str(row["적요"]):
-            matched = False
+    # 2. 데이터 정제 (계정과목 원본 그대로 보존)
+    amt_series = pd.to_numeric(df[col_amt] if col_amt else 0, errors="coerce").fillna(0)
+    acct_series = df[col_acct].fillna("미분류").astype(str).str.strip() if col_acct else pd.Series(["미분류"] * len(df))
+    desc_series = df[col_desc].fillna("-").astype(str).str.strip() if col_desc else pd.Series(["-"] * len(df))
+    vendor_series = df[col_vendor].fillna("-").astype(str).str.strip() if col_vendor else pd.Series(["-"] * len(df))
+    detail_series = df[col_detail].fillna("-").astype(str).str.strip() if col_detail else pd.Series(["-"] * len(df))
+
+    # 3. 비용구분 및 대분류 초기 자동 판정
+    categories = []
+    majors = []
+    sga_keywords = [
+        "판관", "운송경비", "관리비", "임차료", "토지", "감가상각", "AFB", "EDI", "전산",
+        "보안", "에스원", "캡스", "지게차", "리스", "파렛트", "수선비", "부서운영", "식대",
+        "광열", "전기", "수도", "재산세", "세금", "보험료", "소모품"
+    ]
+    for acct, desc, detail in zip(acct_series, desc_series, detail_series):
+        combined = f"{acct} {desc} {detail}"
+        
+        # 비용구분
+        if any(kw in combined for kw in sga_keywords):
+            categories.append("판관비")
         else:
-            for rule in MAPPING_RULES:
-                if rule["condition"](row):
-                    categories.append(rule["category"])
-                    sub_cats.append(rule["sub_cat"])
-                    items.append(rule["item"])
-                    vendors.append(str(row["거래처명"]))
-                    matched = True
-                    break
-        if not matched:
-            acct_val = str(row["계정"]).strip() if str(row["계정"]).strip() not in ["", "nan"] else "미분류"
-            if "운송경비" in acct_val or "감가상각" in str(row["상세"]) or "AFB" in str(row["적요"]) or "재산세" in str(row["상세"]):
-                categories.append("판관비")
-            else:
-                categories.append("매출원가")
-            sub_cats.append(acct_val)
-            detail_val = str(row["상세"]).strip() if str(row["상세"]).strip() not in ["", "-", "nan"] else str(row["적요"])[:20]
-            items.append(detail_val)
-            vendors.append(str(row["거래처명"]))
+            categories.append("매출원가")
+            
+        # 대분류 초기값
+        if "밀크런" in desc or "브이투브이" in combined:
+            majors.append("밀크런")
+        elif "사내매출" in combined or "CBE" in combined:
+            majors.append("사내매출 조정")
+        elif "항공" in combined or "UPS" in combined or "DHL" in combined or "EMS" in combined or "린코스" in combined or "SF" in combined:
+            majors.append("항공 운임")
+        elif "도급" in combined or "엠제이" in combined or "인터비즈" in combined or "교원" in combined:
+            majors.append("도급사")
+        elif "토지" in combined or "임차" in combined:
+            majors.append("토지임차료")
+        elif "전산" in combined or "EDI" in combined or "케이씨넷" in combined:
+            majors.append("전산 (EDI)")
+        elif "감가상각" in combined or "AFB" in combined:
+            majors.append("건물 감가상각비")
+        elif "지게차" in combined or "리스" in combined:
+            majors.append("지게차 리스")
+        elif "보안" in combined or "에스원" in combined or "캡스" in combined:
+            majors.append("출입/보안 (에스원/캡스)")
+        elif "파렛트" in combined:
+            majors.append("파렛트 렌탈")
+        elif "수선" in combined:
+            majors.append("수선비")
+        elif "부서운영" in combined or "식대" in combined:
+            majors.append("부서운영비/야특근식비")
+        elif "카드" in combined:
+            majors.append("카드 수수료")
+        elif "전기" in combined or "수도" in combined or "맥서브" in combined:
+            majors.append("센터 비용")
+        else:
+            majors.append("기타")
 
-    df["비용구분"] = categories
-    df["대분류"] = sub_cats
-    df["세부 항목"] = items
-    df["거래처명"] = vendors
+    # 4. 개별 전표 보존 (계정과목 원본 그대로, 대분류 포함)
+    processed_df = pd.DataFrame({
+        "비용구분": categories,
+        "계정과목": acct_series,
+        "대분류": majors,
+        "적요": desc_series,
+        "거래처명": vendor_series,
+        "상세": detail_series,
+        "전체(Sheet3 총액)": amt_series
+    })
 
-    grouped = df.groupby(["비용구분", "대분류", "세부 항목", "거래처명"], as_index=False)["금액(현지 통화)"].sum()
-    grouped.rename(columns={"금액(현지 통화)": "전체(Sheet3 총액)"}, inplace=True)
-
+    # 화주별 배부액은 임의 배부 없이 0원 시작
     for c in customers:
-        grouped[c] = 0.0
+        processed_df[c] = 0.0
 
-    for idx, row in grouped.iterrows():
-        it = row["세부 항목"]
-        tot = row["전체(Sheet3 총액)"]
-        if it == "(주)인터비즈시스템" and "롯데케미칼" in customers:
-            grouped.loc[idx, "롯데케미칼"] = tot
-        elif it == "RINCOS" and "린코스" in customers:
-            grouped.loc[idx, "린코스"] = tot
-        elif it == "마곡상인" and "마곡상인" in customers:
-            grouped.loc[idx, "마곡상인"] = tot
-
-    grouped["row_id"] = grouped.index
-    return df, grouped
+    processed_df["row_id"] = processed_df.index
+    return df, processed_df
 
 if uploaded_file is not None:
     if "dash_df" not in st.session_state:
         raw_df, init_dash = build_initial_dashboard(uploaded_file, st.session_state.customers)
         st.session_state.raw_df = raw_df
         st.session_state.dash_df = init_dash
+        for m in init_dash["대분류"].dropna().unique():
+            m_clean = str(m).strip()
+            if m_clean and m_clean not in st.session_state.major_categories:
+                st.session_state.major_categories.append(m_clean)
 
     dash_df = st.session_state.dash_df
 
@@ -280,6 +331,7 @@ if uploaded_file is not None:
     # =========================================================================
     with tab1:
         render_customer_manager("tab1")
+        render_major_category_manager("tab1")
 
         st.write("---")
 
@@ -314,8 +366,7 @@ if uploaded_file is not None:
             delta_color="normal" if total_unallocated == 0 else "inverse"
         )
 
-        all_major_options = sorted(list(set(STD_MAJORS + dash_df["대분류"].dropna().unique().tolist())))
-        all_sub_options = sorted(list(set(STD_SUBS + dash_df["세부 항목"].dropna().unique().tolist())))
+        all_major_options = sorted(list(set(st.session_state.major_categories + [str(x) for x in dash_df["대분류"].dropna().unique() if str(x).strip()])))
 
         base_column_config = {
             "비용구분": st.column_config.SelectboxColumn(
@@ -325,19 +376,25 @@ if uploaded_file is not None:
                 width=auto_col_width("🔄 비용구분 (이동)", ["매출원가", "판관비"]),
                 help="'매출원가'와 '판관비'를 변경하면 1번과 2번 표 사이로 즉시 이동합니다."
             ),
+            "계정과목": st.column_config.TextColumn(
+                label="📑 계정과목(원장)",
+                disabled=True,
+                width=auto_col_width("📑 계정과목(원장)", dash_df["계정과목"]),
+                help="원장에 기록된 계정과목명 그대로입니다."
+            ),
             "대분류": st.column_config.SelectboxColumn(
                 label="👉 [선택] 대분류",
                 options=all_major_options,
                 required=True,
+                disabled=False,
                 width=auto_col_width("👉 [선택] 대분류", dash_df["대분류"]),
-                help="클릭하여 대분류를 변경할 수 있습니다."
+                help="클릭하여 대분류를 직접 선택하거나 수정할 수 있습니다."
             ),
-            "세부 항목": st.column_config.SelectboxColumn(
-                label="👉 [선택] 세부 항목",
-                options=all_sub_options,
-                required=True,
-                width=auto_col_width("👉 [선택] 세부 항목", dash_df["세부 항목"]),
-                help="클릭하여 세부 항목을 변경할 수 있습니다."
+            "적요": st.column_config.TextColumn(
+                label="📝 적요",
+                disabled=False,
+                width=auto_col_width("📝 적요", dash_df["적요"]),
+                help="전표 적요 내용을 직접 수정할 수 있습니다."
             ),
             "거래처명": st.column_config.TextColumn(
                 label="🏢 거래처명(원장)",
@@ -346,10 +403,10 @@ if uploaded_file is not None:
                 help="원장에 기록된 매입 거래처명입니다."
             ),
             "전체(Sheet3 총액)": st.column_config.NumberColumn(
-                label="전체(Sheet3 총액)", 
+                label="전체 발생금액", 
                 format="%,d", 
                 disabled=True,
-                width=auto_col_width("전체(Sheet3 총액)", ["3,504,010,871"])
+                width=auto_col_width("전체 발생금액", ["3,504,010,871"])
             ),
             "미분배 잔액": st.column_config.NumberColumn(
                 label="⚠️ 미분배 잔액", 
@@ -368,7 +425,8 @@ if uploaded_file is not None:
                 width=auto_col_width(f"🏢 {c}", ["1,000,000,000"])
             )
 
-        display_cols = ["row_id", "비용구분", "대분류", "세부 항목", "거래처명", "전체(Sheet3 총액)", "미분배 잔액"] + st.session_state.customers
+        # 계정과목(원장) 우측에 [선택] 대분류 배치
+        display_cols = ["row_id", "비용구분", "계정과목", "대분류", "적요", "거래처명", "전체(Sheet3 총액)", "미분배 잔액"] + st.session_state.customers
 
         st.subheader("1. 📦 [매출원가] 거래처별 손익분석")
         cogs_display_df = dash_df[cogs_mask][display_cols].copy()
@@ -396,7 +454,7 @@ if uploaded_file is not None:
             key=f"sga_editor_{st.session_state.editor_version}"
         )
 
-        # 동기화
+        # 동기화 (대분류 및 적요 직접 수정 반영)
         modified = False
         for sub_edited in [edited_cogs, edited_sga]:
             for idx, row in sub_edited.iterrows():
@@ -404,11 +462,11 @@ if uploaded_file is not None:
                 if row["비용구분"] != st.session_state.dash_df.loc[r_id, "비용구분"]:
                     st.session_state.dash_df.loc[r_id, "비용구분"] = row["비용구분"]
                     modified = True
-                if row["대분류"] != st.session_state.dash_df.loc[r_id, "대분류"]:
+                if "대분류" in row and row["대분류"] != st.session_state.dash_df.loc[r_id, "대분류"]:
                     st.session_state.dash_df.loc[r_id, "대분류"] = row["대분류"]
                     modified = True
-                if row["세부 항목"] != st.session_state.dash_df.loc[r_id, "세부 항목"]:
-                    st.session_state.dash_df.loc[r_id, "세부 항목"] = row["세부 항목"]
+                if "적요" in row and row["적요"] != st.session_state.dash_df.loc[r_id, "적요"]:
+                    st.session_state.dash_df.loc[r_id, "적요"] = row["적요"]
                     modified = True
                 for c in st.session_state.customers:
                     new_val = float(row[c]) if pd.notna(row[c]) else 0.0
@@ -423,15 +481,15 @@ if uploaded_file is not None:
 
         col_b1, col_b2 = st.columns(2)
         with col_b1:
-            if st.button("🔄 동일한 [비용구분/대분류/세부항목/거래처] 합산 정리"):
-                agg_dict = {"전체(Sheet3 총액)": "sum"}
+            if st.button("🔄 동일한 [비용구분/대분류/계정과목/거래처] 합산 정리"):
+                agg_dict = {"전체(Sheet3 총액)": "sum", "적요": lambda s: ", ".join(dict.fromkeys(s))[:50]}
                 for c in st.session_state.customers:
                     agg_dict[c] = "sum"
-                merged_df = st.session_state.dash_df.groupby(["비용구분", "대분류", "세부 항목", "거래처명"], as_index=False).agg(agg_dict)
+                merged_df = st.session_state.dash_df.groupby(["비용구분", "대분류", "계정과목", "거래처명"], as_index=False).agg(agg_dict)
                 merged_df["row_id"] = merged_df.index
                 st.session_state.dash_df = merged_df
                 st.session_state.editor_version += 1
-                st.success("합산 정리가 완료되었습니다.")
+                st.success("동일 항목 기준 합산 정리가 완료되었습니다.")
                 st.rerun()
 
     # =========================================================================
@@ -494,7 +552,7 @@ if uploaded_file is not None:
         rm2.metric("매출 발생 거래처 수", f"{active_cust_cnt} / {len(st.session_state.customers)}개 사")
 
     # =========================================================================
-    # [탭 3] 최종 손익계산서 & 대시보드 (전체 자동 너비 적용)
+    # [탭 3] 최종 손익계산서 & 대시보드
     # =========================================================================
     with tab3:
         st.subheader("📈 [통합] 거래처별 최종 손익계산서")
@@ -581,22 +639,22 @@ if uploaded_file is not None:
             hide_index=True
         )
 
-        # 세부 항목 내역 (자동 너비 및 콤마 적용)
+        # 대분류/계정과목별 세부 내역
         with st.expander("🔍 **매출원가 및 판관비 세부 내역 펼쳐보기**", expanded=False):
-            cogs_detail = cogs_sub_df.groupby(["대분류", "세부 항목"], as_index=False)[["전체(Sheet3 총액)"] + st.session_state.customers].sum()
-            sga_detail = sga_sub_df.groupby(["대분류", "세부 항목"], as_index=False)[["전체(Sheet3 총액)"] + st.session_state.customers].sum()
+            cogs_detail = cogs_sub_df.groupby(["대분류", "계정과목"], as_index=False)[["전체(Sheet3 총액)"] + st.session_state.customers].sum()
+            sga_detail = sga_sub_df.groupby(["대분류", "계정과목"], as_index=False)[["전체(Sheet3 총액)"] + st.session_state.customers].sum()
 
             detail_config = {
                 "대분류": st.column_config.TextColumn(
                     label="대분류", 
                     width=auto_col_width("대분류", list(cogs_detail["대분류"]) + list(sga_detail["대분류"]))
                 ),
-                "세부 항목": st.column_config.TextColumn(
-                    label="세부 항목", 
-                    width=auto_col_width("세부 항목", list(cogs_detail["세부 항목"]) + list(sga_detail["세부 항목"]))
+                "계정과목": st.column_config.TextColumn(
+                    label="계정과목", 
+                    width=auto_col_width("계정과목", list(cogs_detail["계정과목"]) + list(sga_detail["계정과목"]))
                 ),
                 "전체(Sheet3 총액)": st.column_config.NumberColumn(
-                    label="전체(Sheet3 총액)", 
+                    label="발생 총액", 
                     format="%,d", 
                     width="medium"
                 )
@@ -608,13 +666,13 @@ if uploaded_file is not None:
                     width="medium"
                 )
 
-            st.markdown("##### 📦 매출원가 세부 내역")
+            st.markdown("##### 📦 매출원가 대분류/계정과목별 내역")
             st.dataframe(cogs_detail, column_config=detail_config, width="stretch", hide_index=True)
 
-            st.markdown("##### 🏢 판관비 세부 내역")
+            st.markdown("##### 🏢 판관비 대분류/계정과목별 내역")
             st.dataframe(sga_detail, column_config=detail_config, width="stretch", hide_index=True)
 
-        # 거래처별 손익 기여 요약 (자동 너비 적용)
+        # 거래처별 손익 기여 요약
         st.write("---")
         st.subheader("📊 거래처별 손익 기여 요약")
         sum_rows = []
@@ -662,7 +720,7 @@ if uploaded_file is not None:
             sum_df.to_excel(writer, sheet_name="거래처별_손익요약", index=False)
             dash_df[dash_df["비용구분"] == "매출원가"].to_excel(writer, sheet_name="1.매출원가_상세배부", index=False)
             dash_df[dash_df["비용구분"] == "판관비"].to_excel(writer, sheet_name="2.판관비_상세배부", index=False)
-            st.session_state.raw_df.to_excel(writer, sheet_name="원장전체_매핑내역", index=False)
+            st.session_state.raw_df.to_excel(writer, sheet_name="원장전체_원본내역", index=False)
 
             ws = writer.sheets["최종_손익요약"]
             for col_idx in range(2, len(summary_pnl_df.columns) + 1):
