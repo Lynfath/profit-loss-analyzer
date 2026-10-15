@@ -808,7 +808,7 @@ def render_tab5_cogs_calc():
     wh_head_l, wh_head_r = st.columns([3, 1])
     with wh_head_l:
         st.markdown("##### 📦 1) 창고 풀필먼트 운영 요율표 (매입 단가 / 단위: 원, VAT 별도)")
-        st.caption("※ '작업 상세 및 비고'는 [탭 4] 견적서와 자동 동기화되며, '매입 단가' 수정 시 [탭 6] 예상손익 분석표에 즉시 반영됩니다.")
+        st.caption("※ '작업 상세 및 비고'는 [탭 4] 견적서에서 자동 연동(수정 불가)되며, 이 표에서는 '매입 단가'만 수정하여 [탭 6] 예상손익에 반영합니다.")
     with wh_head_r:
         with st.expander("🎯 목표 마진율로 제안단가 역산", expanded=False):
             target_m = st.slider("창고 목표 마진율 (%)", min_value=0.0, max_value=50.0, value=float(st.session_state.get("q_wh_target_margin", 15.0)), step=1.0, key="slider_wh_target_margin")
@@ -825,22 +825,16 @@ def render_tab5_cogs_calc():
     edited_cogs_wh = st.data_editor(
         st.session_state.q_warehouse_df[["구분", "작업 내용", "단위", "매입단가", "비고"]],
         column_config={
-            "구분": st.column_config.TextColumn(label="구분", width="small"),
+            "구분": st.column_config.TextColumn(label="구분", width="small", disabled=True),
             "작업 내용": st.column_config.TextColumn(label="작업 내용", width="medium", disabled=True),
-            "단위": st.column_config.TextColumn(label="기본 단위", width="small"),
-            "매입단가": st.column_config.NumberColumn(label="매입 단가 (원가)", format="%,d", min_value=0.0, width="medium"),
-            "비고": st.column_config.TextColumn(label="작업 상세 및 비고", width="large")
+            "단위": st.column_config.TextColumn(label="기본 단위", width="small", disabled=True),
+            "매입단가": st.column_config.NumberColumn(label="매입 단가 (원가)", format="%,d", min_value=0.0, width="medium", disabled=False),
+            "비고": st.column_config.TextColumn(label="작업 상세 및 비고 ([탭 4] 견적서 연동)", width="large", disabled=True)
         },
         width="stretch", hide_index=True, key=f"editor_cogs_wh_{st.session_state.quote_editor_version}"
     )
     cogs_wh_changed = False
     for idx, row in edited_cogs_wh.iterrows():
-        for col_k in ["구분", "단위", "비고"]:
-            new_v = str(row[col_k]) if pd.notna(row.get(col_k)) else ""
-            old_v = str(st.session_state.q_warehouse_df.loc[idx, col_k])
-            if new_v != old_v:
-                st.session_state.q_warehouse_df.loc[idx, col_k] = new_v
-                cogs_wh_changed = True
         new_bp = float(row["매입단가"]) if pd.notna(row.get("매입단가")) else 0.0
         if abs(new_bp - float(st.session_state.q_warehouse_df.loc[idx, "매입단가"])) > 1e-4:
             st.session_state.q_warehouse_df.loc[idx, "매입단가"] = new_bp
@@ -855,7 +849,7 @@ def render_tab5_cogs_calc():
     exp_head_l, exp_head_r = st.columns([3, 1])
     with exp_head_l:
         st.markdown("##### ✈️ 2) 해외 발송 특송 매입 단가표 (단위: 원, VAT 별도)")
-        st.caption("※ 국가별 특송 매입 단가 및 발송 비중(%)을 관리합니다. '비고'는 [탭 4] 견적서와 연동됩니다.")
+        st.caption("※ '작업 상세 및 비고'는 [탭 4] 견적서에서 자동 연동(수정 불가)되며, 국가별 '매입 단가' 및 '발송 비중(%)'만 수정합니다.")
     with exp_head_r:
         with st.expander("🎯 매입원가 기준 제안단가 동기화", expanded=False):
             sync_m = st.slider("특송 마진율 (%)", min_value=1.0, max_value=30.0, value=float(st.session_state.q_express_margin), step=0.5, key=f"slider_cogs_exp_margin_{st.session_state.quote_editor_version}")
@@ -871,9 +865,9 @@ def render_tab5_cogs_calc():
         column_config={
             "국가": st.column_config.TextColumn(label="국가", width="small", disabled=True),
             "기준구간": st.column_config.TextColumn(label="기준 구간", width="small", disabled=True),
-            "매입원가": st.column_config.NumberColumn(label="매입 단가 (원)", format="%,d", min_value=0.0, width="medium"),
-            "발송비중(%)": st.column_config.NumberColumn(label="발송 비중 (%)", format="%.1f%%", min_value=0.0, max_value=100.0, width="small"),
-            "비고": st.column_config.TextColumn(label="작업 상세 및 비고", width="large")
+            "매입원가": st.column_config.NumberColumn(label="매입 단가 (원)", format="%,d", min_value=0.0, width="medium", disabled=False),
+            "발송비중(%)": st.column_config.NumberColumn(label="발송 비중 (%)", format="%.1f%%", min_value=0.0, max_value=100.0, width="small", disabled=False),
+            "비고": st.column_config.TextColumn(label="작업 상세 및 비고 ([탭 4] 견적서 연동)", width="large", disabled=True)
         },
         width="stretch", hide_index=True, key=f"editor_cogs_exp_{st.session_state.quote_editor_version}"
     )
@@ -886,10 +880,6 @@ def render_tab5_cogs_calc():
         new_w = float(row["발송비중(%)"]) if pd.notna(row.get("발송비중(%)")) else 0.0
         if abs(new_w - float(st.session_state.q_express_df.loc[idx, "발송비중(%)"])) > 1e-4:
             st.session_state.q_express_df.loc[idx, "발송비중(%)"] = new_w
-            cogs_exp_changed = True
-        new_note = str(row["비고"]) if pd.notna(row.get("비고")) else ""
-        if new_note != str(st.session_state.q_express_df.loc[idx, "비고"]):
-            st.session_state.q_express_df.loc[idx, "비고"] = new_note
             cogs_exp_changed = True
     if cogs_exp_changed:
         st.session_state.quote_editor_version += 1
