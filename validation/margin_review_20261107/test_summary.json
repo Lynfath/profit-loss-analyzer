@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "baseline_commit": "fb47fc6ed99bf2da1414e6a9e23a9c33280813a4",
+  "baseline_app_git_blob": "b959fe6814927da29e5b3062a52dd0a44ff3bce8",
+  "hypothetical_data_only": true,
+  "pytest": {
+    "tests": "115",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "82.652"
+  },
+  "matrix_scenarios": 32,
+  "environment": {
+    "Python": "3.12.14",
+    "streamlit": "1.67.0",
+    "pandas": "2.2.3",
+    "openpyxl": "3.1.5",
+    "pytest": "9.2.0"
+  },
+  "native_browser_visual_status": "INCONCLUSIVE: Chromium socket() Operation not permitted",
+  "native_excel_application_status": "INCONCLUSIVE: no Excel application round-trip performed",
+  "business_intent_status": "INCONCLUSIVE: UI contains both cost-plus and target-margin terminology"
+}

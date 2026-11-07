@@ -1,0 +1,116 @@
+{
+  "base_sha": "fb47fc6ed99bf2da1414e6a9e23a9c33280813a4",
+  "hypothetical_only": true,
+  "rates": [
+    {
+      "target_percent": 10,
+      "warehouse_price": 11000.0,
+      "express_prices": [
+        11000.0,
+        22000.0
+      ],
+      "actual_unit_gross_percent": 9.090909090909092,
+      "warehouse_revenue": 1100000.0,
+      "direct_cogs": 1000000,
+      "infra_cogs": 100000,
+      "sga_percent_of_warehouse_revenue": 7,
+      "sga": 77000.0,
+      "total_cost": 1177000.0,
+      "operating_profit": -77000.0,
+      "operating_margin_percent": -7.000000000000001,
+      "all_three_download_values_match_after_stable_rerun": true
+    },
+    {
+      "target_percent": 15,
+      "warehouse_price": 11500.0,
+      "express_prices": [
+        11500.0,
+        23000.0
+      ],
+      "actual_unit_gross_percent": 13.043478260869565,
+      "warehouse_revenue": 1150000.0,
+      "direct_cogs": 1000000,
+      "infra_cogs": 100000,
+      "sga_percent_of_warehouse_revenue": 7,
+      "sga": 80500.0,
+      "total_cost": 1180500.0,
+      "operating_profit": -30500.0,
+      "operating_margin_percent": -2.6521739130434785,
+      "all_three_download_values_match_after_stable_rerun": true
+    },
+    {
+      "target_percent": 20,
+      "warehouse_price": 12000.0,
+      "express_prices": [
+        12000.0,
+        24000.0
+      ],
+      "actual_unit_gross_percent": 16.666666666666664,
+      "warehouse_revenue": 1200000.0,
+      "direct_cogs": 1000000,
+      "infra_cogs": 100000,
+      "sga_percent_of_warehouse_revenue": 7,
+      "sga": 84000.0,
+      "total_cost": 1184000.0,
+      "operating_profit": 16000.0,
+      "operating_margin_percent": 1.3333333333333335,
+      "all_three_download_values_match_after_stable_rerun": true
+    },
+    {
+      "target_percent": 30,
+      "warehouse_price": 13000.0,
+      "express_prices": [
+        13000.0,
+        26000.0
+      ],
+      "actual_unit_gross_percent": 23.076923076923077,
+      "warehouse_revenue": 1300000.0,
+      "direct_cogs": 1000000,
+      "infra_cogs": 100000,
+      "sga_percent_of_warehouse_revenue": 7,
+      "sga": 91000.0,
+      "total_cost": 1191000.0,
+      "operating_profit": 109000.0,
+      "operating_margin_percent": 8.384615384615385,
+      "all_three_download_values_match_after_stable_rerun": true
+    }
+  ],
+  "stale_download_reproduction": {
+    "action": "Change tab6 SG&A from 7% to 15%, one UI run",
+    "tab4_sga": 89523,
+    "tab5_sga": 89523,
+    "tab6_sga": 191835,
+    "status": "FAIL"
+  },
+  "zero_express_reproduction": {
+    "exceptions": [],
+    "displayed_rate": "nan%",
+    "status": "FAIL"
+  },
+  "express_entrypoints_at_20_percent": [
+    {
+      "control": "pop_margin_slider_",
+      "actual_prices": [
+        12000.0,
+        24000.0
+      ],
+      "gross_margin_target_status": "FAIL"
+    },
+    {
+      "control": "slider_cogs_exp_margin_",
+      "actual_prices": [
+        12000.0,
+        24000.0
+      ],
+      "gross_margin_target_status": "FAIL"
+    },
+    {
+      "control": "slider_tab6_margin_",
+      "actual_prices": [
+        12000.0,
+        24000.0
+      ],
+      "gross_margin_target_status": "FAIL"
+    }
+  ]
+}

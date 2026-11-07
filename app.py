@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import io
 import openpyxl
+import math
+from decimal import Decimal, ROUND_CEILING
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
@@ -203,6 +205,9 @@ def build_initial_dashboard(file, customers):
 # [견적 산정 & 매출원가 산출 & 예상손익 분석] 헬퍼 및 엑셀 빌더 (Single Source of Truth)
 # =============================================================================
 def init_quote_state():
+    # Existing sessions and prices keep the legacy cost-markup interpretation.
+    if "q_pricing_basis" not in st.session_state:
+        st.session_state.q_pricing_basis = "markup"
     if "quote_initialized" not in st.session_state:
         st.session_state.quote_initialized = True
         st.session_state.q_company = ""
@@ -265,6 +270,50 @@ def init_quote_state():
             {"구분": "보험료", "작업 내용": "화재보험료", "단위": "평/월", "매입단가": 1311.0, "비고": "센터 화재보험료 평당 월 배부 단가"},
             {"구분": "현장운영", "작업 내용": "소모품비 外", "단위": "식/월", "매입단가": 30000.0, "비고": "센터 현장 운영 기본 소모품 월 고정 배부액"}
         ])
+
+PRICING_BASES = {"markup": "원가 가산율 (기존 방식)", "gross_margin": "목표 매출총이익률"}
+
+def proposal_price(cost, rate, basis="markup"):
+    """Return a scalar or Series of VAT-exclusive proposal prices in KRW.
+
+    Legacy markup keeps its original nearest-10-won rounding. Gross margin
+    rounds UP to 10 won so rounding cannot reduce a positive-cost target.
+    This is a unit-price target before separately allocated infra and SG&A.
+    """
+    rate = float(rate)
+    if basis not in PRICING_BASES or not math.isfinite(rate) or rate < 0:
+        raise ValueError("단가 산정 기준과 비율을 확인해주세요.")
+    if basis == "gross_margin" and rate >= 100:
+        raise ValueError("목표 매출총이익률은 100% 미만이어야 합니다.")
+    if basis == "markup":
+        price = cost * (1.0 + rate / 100.0)
+        return price.round(-1) if isinstance(cost, pd.Series) else round(price, -1)
+    if isinstance(cost, pd.Series):
+        return cost.map(lambda value: proposal_price(value, rate, basis))
+    if not math.isfinite(float(cost)) or cost < 0:
+        raise ValueError("매입원가는 0 이상의 유한한 값이어야 합니다.")
+    price = Decimal(str(cost)) / (Decimal(1) - Decimal(str(rate)) / 100)
+    return float((price / 10).to_integral_value(rounding=ROUND_CEILING) * 10)
+
+def sync_quote_input(widget_key, state_key):
+    # Callbacks run before all tabs, so earlier download buttons use fresh inputs.
+    st.session_state[state_key] = st.session_state[widget_key]
+
+def render_pricing_basis(tab_key):
+    key = f"pricing_basis_{tab_key}"
+    st.session_state[key] = st.session_state.q_pricing_basis
+    st.radio("자동 단가 산정 기준 (탭 4·5·6 공통)", list(PRICING_BASES),
+             format_func=PRICING_BASES.get, horizontal=True, key=key,
+             on_change=sync_quote_input, args=(key, "q_pricing_basis"))
+    st.caption("원가 가산율 = (판매가−원가)÷원가. 매출총이익률 = (판매가−원가)÷판매가. "
+               "기준 선택만으로 기존 단가는 변경되지 않습니다. 재계산 버튼 또는 탭 6 특송 비율 변경 시 적용됩니다.")
+    if st.session_state.q_pricing_basis == "gross_margin":
+        st.caption("판매가 = 매입원가 ÷ (1−목표율/100), 10원 단위 올림. "
+                   "개별 매입단가 기준이며 별도 인프라·일반관리비 차감 후 영업이익률은 달라집니다. "
+                   "창고 매입단가 0원 항목은 기존 제안단가를 유지합니다.")
+    else:
+        st.caption("판매가 = 매입원가 × (1+가산율/100), 기존과 동일하게 10원 단위 반올림.")
+    return "매출총이익률" if st.session_state.q_pricing_basis == "gross_margin" else "원가 가산율"
 
 def get_quote_vol_dict():
     return {
@@ -526,7 +575,7 @@ def build_quote_workbook(meta, wh_df, exp_df, exp_margin, vol_dict, include_exp=
         erev, ecost = eqty * asell, eqty * abuy
         eop = erev - ecost
         tot_rev += erev; tot_cost += ecost
-        for col_l, v, a, nf in [("B","해외특송","center",None), ("C","저중량 구간 (≤2kg) 평균","left",None), ("D","건","center",None), ("E",eqty,"right","#,##0"), ("F",asell,"right","#,##0"), ("G",erev,"right","#,##0"), ("I","해외특송 매입운임","left",None), ("J","건","center",None), ("K",eqty,"right","#,##0"), ("L",abuy,"right","#,##0"), ("M",ecost,"right","#,##0"), ("N",eop,"right","#,##0"), ("O",f"{(eop/erev*100):.1f}%","center",None), ("P","해외발송 특송 건당 정산","left",None)]:
+        for col_l, v, a, nf in [("B","해외특송","center",None), ("C","저중량 구간 (≤2kg) 평균","left",None), ("D","건","center",None), ("E",eqty,"right","#,##0"), ("F",asell,"right","#,##0"), ("G",erev,"right","#,##0"), ("I","해외특송 매입운임","left",None), ("J","건","center",None), ("K",eqty,"right","#,##0"), ("L",abuy,"right","#,##0"), ("M",ecost,"right","#,##0"), ("N",eop,"right","#,##0"), ("O",(f"{(eop/erev*100):.1f}%" if erev > 0 else "0.0%"),"center",None), ("P","해외발송 특송 건당 정산","left",None)]:
             set_c(ws2, f"{col_l}{r_s2}", v, align=Alignment(a, "center"), num_fmt=nf)
         r_s2 += 1
 
@@ -590,6 +639,7 @@ def build_quote_workbook(meta, wh_df, exp_df, exp_margin, vol_dict, include_exp=
 def render_tab4_proposal():
     init_quote_state()
     st.subheader("📄 화주사 제출용 견적서")
+    rate_label = render_pricing_basis("tab4")
     st.caption("💡 화주사 제출용 정식 견적서 서식입니다. 제안 단가 및 작업 상세/비고는 **[탭 5] 매출원가 산출 및 [탭 6] 예상손익 분석표와 100% 자동 연동(Single Source of Truth)**됩니다.")
 
     with st.expander("📝 **제안서 기본 정보 (회사명 / 제목 / 수신처 / 특약 / 정산조건) 설정**", expanded=False):
@@ -651,17 +701,17 @@ def render_tab4_proposal():
     st.write("---")
 
     st.markdown("##### ✈️ 2) 해외 발송 특송 제안 단가표")
-    st.caption("※ '판매 제안단가'를 표에서 직접 수정하실 수 있으며, 필요 시 우측 마진율 슬라이더를 통해 매입원가 대비 일괄 재계산도 가능합니다.")
+    st.caption("※ '판매 제안단가'를 직접 수정하거나, 선택한 단가 산정 기준으로 일괄 재계산할 수 있습니다.")
 
     exp_tool1, exp_tool2 = st.columns([3, 1])
     with exp_tool1:
         pass
     with exp_tool2:
-        with st.expander("🎯 마진율 일괄 계산 (선택사항)", expanded=False):
-            new_margin = st.slider("적용 마진율 (%)", min_value=1.0, max_value=30.0, value=float(st.session_state.q_express_margin), step=0.5, key=f"pop_margin_slider_{st.session_state.quote_editor_version}")
-            if st.button("마진율로 일괄 재계산", key="btn_recalc_express_margin"):
+        with st.expander(f"🎯 {rate_label} 일괄 계산 (선택사항)", expanded=False):
+            new_margin = st.slider(f"적용 {rate_label} (%)", min_value=1.0, max_value=30.0, value=float(st.session_state.q_express_margin), step=0.5, key=f"pop_margin_slider_{st.session_state.quote_editor_version}")
+            if st.button(f"{rate_label}로 일괄 재계산", key="btn_recalc_express_margin"):
                 st.session_state.q_express_margin = new_margin
-                st.session_state.q_express_df["판매 제안단가"] = (st.session_state.q_express_df["매입원가"] * (1.0 + new_margin / 100.0)).round(-1)
+                st.session_state.q_express_df["판매 제안단가"] = proposal_price(st.session_state.q_express_df["매입원가"], new_margin, st.session_state.q_pricing_basis)
                 st.session_state.quote_editor_version += 1
                 st.rerun()
 
@@ -787,6 +837,7 @@ def render_tab5_cogs_calc():
     vol_dict = get_quote_vol_dict()
 
     st.subheader("🛠️ 매출원가 산출")
+    rate_label = render_pricing_basis("tab5")
     st.caption("💡 **[탭 4] 견적서**의 작업 상세/비고 데이터와 100% 연동되며, 여기서 설정한 **매입 단가** 및 **센터 인프라 고정비**는 **[탭 6] 예상손익 분석표**의 원가로 실시간 반영됩니다.")
 
     # 상단 원가 요약 KPI 카드 (자체 추가 기능 1)
@@ -810,16 +861,16 @@ def render_tab5_cogs_calc():
         st.markdown("##### 📦 1) 창고 풀필먼트 운영 요율표 (매입 단가 / 단위: 원, VAT 별도)")
         st.caption("※ '작업 상세 및 비고'는 [탭 4] 견적서에서 자동 연동(수정 불가)되며, 이 표에서는 '매입 단가'만 수정하여 [탭 6] 예상손익에 반영합니다.")
     with wh_head_r:
-        with st.expander("🎯 목표 마진율로 제안단가 역산", expanded=False):
-            target_m = st.slider("창고 목표 마진율 (%)", min_value=0.0, max_value=50.0, value=float(st.session_state.get("q_wh_target_margin", 15.0)), step=1.0, key="slider_wh_target_margin")
+        with st.expander(f"🎯 {rate_label}로 제안단가 계산", expanded=False):
+            target_m = st.slider(f"창고 {rate_label} (%)", min_value=0.0, max_value=50.0, value=float(st.session_state.get("q_wh_target_margin", 15.0)), step=1.0, key="slider_wh_target_margin")
             if st.button("매입단가 기준 제안단가 일괄 반영", key="btn_apply_wh_markup"):
                 st.session_state.q_wh_target_margin = target_m
                 for idx_r, r_wh in st.session_state.q_warehouse_df.iterrows():
                     bp_v = float(r_wh["매입단가"])
                     if bp_v > 0:
-                        st.session_state.q_warehouse_df.loc[idx_r, "제안단가"] = round(bp_v * (1.0 + target_m / 100.0), -1)
+                        st.session_state.q_warehouse_df.loc[idx_r, "제안단가"] = proposal_price(bp_v, target_m, st.session_state.q_pricing_basis)
                 st.session_state.quote_editor_version += 1
-                st.success(f"매입단가 대비 +{target_m:.0f}% 마진율이 [탭 4] 제안단가에 반영되었습니다.")
+                st.success(f"{rate_label} {target_m:.0f}% 기준 단가가 [탭 4]에 반영되었습니다.")
                 st.rerun()
 
     edited_cogs_wh = st.data_editor(
@@ -852,12 +903,12 @@ def render_tab5_cogs_calc():
         st.caption("※ '작업 상세 및 비고'는 [탭 4] 견적서에서 자동 연동(수정 불가)되며, 국가별 '매입 단가' 및 '발송 비중(%)'만 수정합니다.")
     with exp_head_r:
         with st.expander("🎯 매입원가 기준 제안단가 동기화", expanded=False):
-            sync_m = st.slider("특송 마진율 (%)", min_value=1.0, max_value=30.0, value=float(st.session_state.q_express_margin), step=0.5, key=f"slider_cogs_exp_margin_{st.session_state.quote_editor_version}")
+            sync_m = st.slider(f"특송 {rate_label} (%)", min_value=1.0, max_value=30.0, value=float(st.session_state.q_express_margin), step=0.5, key=f"slider_cogs_exp_margin_{st.session_state.quote_editor_version}")
             if st.button("특송 제안단가 일괄 재계산", key="btn_cogs_recalc_exp"):
                 st.session_state.q_express_margin = sync_m
-                st.session_state.q_express_df["판매 제안단가"] = (st.session_state.q_express_df["매입원가"] * (1.0 + sync_m / 100.0)).round(-1)
+                st.session_state.q_express_df["판매 제안단가"] = proposal_price(st.session_state.q_express_df["매입원가"], sync_m, st.session_state.q_pricing_basis)
                 st.session_state.quote_editor_version += 1
-                st.success(f"특송 매입단가 대비 +{sync_m:.1f}%가 [탭 4] 제안단가에 반영되었습니다.")
+                st.success(f"특송 {rate_label} {sync_m:.1f}% 기준 단가가 [탭 4]에 반영되었습니다.")
                 st.rerun()
 
     edited_cogs_exp = st.data_editor(
@@ -1013,23 +1064,25 @@ def render_tab6_pnl_simulation():
     infra_df = st.session_state.q_infra_df
     q_rec = st.session_state.q_receiver
     st.subheader(f'📊 [예상손익] "{q_rec}" 예상손익 분석표 및 시뮬레이터')
+    rate_label = render_pricing_basis("tab6")
+    st.caption("단가 산정 비율은 개별 매입단가 기준입니다. 최종 이익률은 인프라 원가와 일반관리비를 차감한 영업이익률이며, 일반관리비는 창고 운영매출에만 배부됩니다.")
     st.caption("💡 **[탭 4] 제안 단가**와 **[탭 5] 매입 단가(매출원가)** 및 월 예상 물동량에 따른 [매출액 → 매입원가 → 영업이익 및 이익률]을 실시간 산출합니다.")
 
     with st.expander("⚙️ **1. 조건별 물동량 및 시뮬레이션 입력창 (Input Dashboard)**", expanded=True):
         sc1, sc2, sc3, sc4 = st.columns(4)
-        st.session_state.q_vol_b2c = sc1.number_input("📦 B2C 출고 건수 (건/월)", min_value=0, max_value=1000000, value=st.session_state.q_vol_b2c, step=100, key="in_q_vol_b2c")
-        st.session_state.q_multi_pcs = sc2.number_input("🧩 합포장 물량 (PCS/월)", min_value=0, max_value=500000, value=st.session_state.q_multi_pcs, step=50, key="in_q_multi_pcs")
-        st.session_state.q_storage_pyeong = sc3.number_input("🏬 보관 평수 (평)", min_value=0, max_value=10000, value=st.session_state.q_storage_pyeong, step=5, key="in_q_storage_pyeong")
-        st.session_state.q_express_qty = sc4.number_input("✈️ 해외특송 발송 건수 (건/월)", min_value=0, max_value=500000, value=st.session_state.q_express_qty, step=100, key="in_q_express_qty")
+        st.session_state.q_vol_b2c = sc1.number_input("📦 B2C 출고 건수 (건/월)", min_value=0, max_value=1000000, value=st.session_state.q_vol_b2c, step=100, key="in_q_vol_b2c", on_change=sync_quote_input, args=("in_q_vol_b2c", "q_vol_b2c"))
+        st.session_state.q_multi_pcs = sc2.number_input("🧩 합포장 물량 (PCS/월)", min_value=0, max_value=500000, value=st.session_state.q_multi_pcs, step=50, key="in_q_multi_pcs", on_change=sync_quote_input, args=("in_q_multi_pcs", "q_multi_pcs"))
+        st.session_state.q_storage_pyeong = sc3.number_input("🏬 보관 평수 (평)", min_value=0, max_value=10000, value=st.session_state.q_storage_pyeong, step=5, key="in_q_storage_pyeong", on_change=sync_quote_input, args=("in_q_storage_pyeong", "q_storage_pyeong"))
+        st.session_state.q_express_qty = sc4.number_input("✈️ 해외특송 발송 건수 (건/월)", min_value=0, max_value=500000, value=st.session_state.q_express_qty, step=100, key="in_q_express_qty", on_change=sync_quote_input, args=("in_q_express_qty", "q_express_qty"))
         sc5, sc6, sc7, sc8 = st.columns(4)
-        st.session_state.q_inbound_qty = sc5.number_input("📥 입고/검수 물량 (건/월)", min_value=0, max_value=500000, value=st.session_state.q_inbound_qty, step=100, key="in_q_inbound_qty")
-        st.session_state.q_dim_qty = sc6.number_input("📏 체적측정 물량 (PCS/월)", min_value=0, max_value=500000, value=st.session_state.q_dim_qty, step=100, key="in_q_dim_qty")
-        st.session_state.q_customs_qty = sc7.number_input("📑 간이수출신고 (건/월)", min_value=0, max_value=500000, value=st.session_state.q_customs_qty, step=100, key="in_q_customs_qty")
+        st.session_state.q_inbound_qty = sc5.number_input("📥 입고/검수 물량 (건/월)", min_value=0, max_value=500000, value=st.session_state.q_inbound_qty, step=100, key="in_q_inbound_qty", on_change=sync_quote_input, args=("in_q_inbound_qty", "q_inbound_qty"))
+        st.session_state.q_dim_qty = sc6.number_input("📏 체적측정 물량 (PCS/월)", min_value=0, max_value=500000, value=st.session_state.q_dim_qty, step=100, key="in_q_dim_qty", on_change=sync_quote_input, args=("in_q_dim_qty", "q_dim_qty"))
+        st.session_state.q_customs_qty = sc7.number_input("📑 간이수출신고 (건/월)", min_value=0, max_value=500000, value=st.session_state.q_customs_qty, step=100, key="in_q_customs_qty", on_change=sync_quote_input, args=("in_q_customs_qty", "q_customs_qty"))
         
-        cur_margin = sc8.slider("🎯 해외특송 기준 마진율 (%)", min_value=1.0, max_value=30.0, value=float(st.session_state.q_express_margin), step=0.5, key=f"slider_tab6_margin_{st.session_state.quote_editor_version}")
+        cur_margin = sc8.slider(f"🎯 해외특송 {rate_label} (%)", min_value=1.0, max_value=30.0, value=float(st.session_state.q_express_margin), step=0.5, key=f"slider_tab6_margin_{st.session_state.quote_editor_version}")
         if cur_margin != st.session_state.q_express_margin:
             st.session_state.q_express_margin = cur_margin
-            st.session_state.q_express_df["판매 제안단가"] = (st.session_state.q_express_df["매입원가"] * (1.0 + cur_margin / 100.0)).round(-1)
+            st.session_state.q_express_df["판매 제안단가"] = proposal_price(st.session_state.q_express_df["매입원가"], cur_margin, st.session_state.q_pricing_basis)
             st.session_state.quote_editor_version += 1
             st.rerun()
 
@@ -1037,13 +1090,13 @@ def render_tab6_pnl_simulation():
             st.session_state.q_sga_rate = 7.0
 
         c_opt1, c_opt2, c_opt3 = st.columns([1.4, 1.4, 1.2])
-        st.session_state.q_include_express = c_opt1.checkbox("✈️ 해외특송(매출/원가)을 전체 손익표에 정식 합산", value=st.session_state.q_include_express, key="in_q_include_express")
+        st.session_state.q_include_express = c_opt1.checkbox("✈️ 해외특송(매출/원가)을 전체 손익표에 정식 합산", value=st.session_state.q_include_express, key="in_q_include_express", on_change=sync_quote_input, args=("in_q_include_express", "q_include_express"))
         chk_inf_6 = c_opt2.checkbox("🏢 센터 인프라 고정비를 손익표 매입원가에 합산", value=st.session_state.get("q_include_infra", False), key=f"in_q_include_infra_{st.session_state.quote_editor_version}")
         if chk_inf_6 != st.session_state.get("q_include_infra", False):
             st.session_state.q_include_infra = chk_inf_6
             st.session_state.quote_editor_version += 1
             st.rerun()
-        st.session_state.q_sga_rate = c_opt3.number_input("🏢 일반관리비 (%)", min_value=0.0, max_value=50.0, value=float(st.session_state.q_sga_rate), step=0.5, format="%.1f", key="in_q_sga_rate")
+        st.session_state.q_sga_rate = c_opt3.number_input("🏢 일반관리비 (%)", min_value=0.0, max_value=50.0, value=float(st.session_state.q_sga_rate), step=0.5, format="%.1f", key="in_q_sga_rate", on_change=sync_quote_input, args=("in_q_sga_rate", "q_sga_rate"))
 
     st.write("---")
     vol_dict = get_quote_vol_dict()
@@ -1060,7 +1113,7 @@ def render_tab6_pnl_simulation():
         exp_rev, exp_cost = exp_qty * avg_sell, exp_qty * avg_buy
         exp_op = exp_rev - exp_cost
         tot_rev += exp_rev; tot_cost += exp_cost
-        pnl_rows.append({"구분": "해외특송", "작업 내용": "저중량 구간 (≤2kg) 평균", "단위": "건", "물량": exp_qty, "판매단가": avg_sell, "매출액": exp_rev, "매입단가": avg_buy, "매입원가": exp_cost, "영업이익": exp_op, "이익률": f"{(exp_op/exp_rev*100):.1f}%", "비고": "해외발송 특송 건당 정산"})
+        pnl_rows.append({"구분": "해외특송", "작업 내용": "저중량 구간 (≤2kg) 평균", "단위": "건", "물량": exp_qty, "판매단가": avg_sell, "매출액": exp_rev, "매입단가": avg_buy, "매입원가": exp_cost, "영업이익": exp_op, "이익률": (f"{(exp_op/exp_rev*100):.1f}%" if exp_rev > 0 else "0.0%"), "비고": "해외발송 특송 건당 정산"})
 
     for idx, row in wh_df.iterrows():
         iname = str(row["작업 내용"])
